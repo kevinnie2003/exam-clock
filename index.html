@@ -189,7 +189,7 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>
         <span class="label">Exam Clock</span>
       </div>
-      <h1 class="exam-title" id="title" contenteditable="true" spellcheck="false" aria-label="Exam title">CSE 100 · Quiz 2</h1>
+      <h1 class="exam-title" id="title" contenteditable="true" spellcheck="false" aria-label="Exam title">Untitled exam</h1>
       <span class="title-hint">Click the title to rename it.</span>
     </div>
     <div class="top-actions">
@@ -331,18 +331,15 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
   };
 
   const MIN = 60000;
-  const SAMPLE_NOTES = '<p>Please bring your student ID when you hand in the quiz.</p><ul><li>Write your <b>PID</b> on every page</li><li>Fill in the bubbles for Q1–15</li><li>Q16–19: write the letter in the numbered box<ul><li>Q18 typo: “heap” should read <span style="color: rgb(255, 0, 1);">“min-heap”</span></li></ul></li></ul><p><span style="background-color: rgb(255, 241, 1);">No calculators.</span> One double-sided note sheet allowed.</p>';
 
   // ---- state ----
-  const roundTo5 = (t) => Math.ceil(t / (5 * MIN)) * 5 * MIN;
   const state = {
-    title: store.get('title', 'CSE 100 · Quiz 2'),
-    notes: store.get('notes', SAMPLE_NOTES),
+    title: store.get('title', 'Untitled exam'),
+    notes: store.get('notes', ''),
     endAt: store.get('endAt', null),
     startAt: store.get('startAt', null),
     scale: store.get('scale', 1),
   };
-  if (state.endAt == null) { state.endAt = roundTo5(Date.now() + 95 * MIN); state.startAt = state.endAt - 120 * MIN; }
 
   // ---- formatting ----
   const timeFmt = (secs) => new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', ...(secs ? { second: '2-digit' } : {}) });
@@ -426,6 +423,8 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
     if (b.dataset.add) { const d = new Date(Date.now() + Number(b.dataset.add) * MIN); d.setSeconds(0, 0); setEnd(d.getTime()); }
     if (b.dataset.nudge && state.endAt != null) setEnd(state.endAt + Number(b.dataset.nudge) * MIN, true);
   });
+
+  if (state.endAt == null) changeBtn.click();
 
   // ---- title ----
   const titleEl = $('#title');
