@@ -112,9 +112,23 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
 .chip:hover { border-color: var(--accent); color: var(--accent); }
 .picker small { color: var(--muted); }
 
-.chime-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: .9rem; }
-.toggle { display: flex; gap: 8px; align-items: center; cursor: pointer; }
-.toggle input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+.alert-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: .9rem; }
+.alert-row span { color: var(--muted); }
+
+/* Full-screen alert banner + red frame on the presentation screen in the last 5 minutes */
+.alert { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--state) 22%, transparent); cursor: pointer; }
+.alert-card { background: var(--state); color: var(--bg); border-radius: 24px; padding: 4vh 5vw; text-align: center; box-shadow: 0 30px 80px rgb(0 0 0 / .3); max-width: 100%; }
+.alert-title { margin: 0; font-family: var(--font-digits); font-weight: 700; font-size: clamp(2.6rem, 9vw, 10rem); line-height: 1; }
+.alert-sub { margin: 1.5vh 0 0; font-size: clamp(1rem, 2.4vw, 2.4rem); font-weight: 700; }
+.alert-hint { margin: 2vh 0 0; font-size: .9rem; opacity: .8; }
+.stage[data-state="crit"], .stage[data-state="done"] { box-shadow: inset 0 0 0 10px var(--crit); }
+@media (prefers-reduced-motion: no-preference) {
+  .alert-card { animation: pop .35s ease-out, flash 1s ease-in-out .35s 4; }
+  .stage[data-state="crit"], .stage[data-state="done"] { animation: frame 2s ease-in-out infinite; }
+}
+@keyframes pop { from { transform: scale(.8); opacity: 0; } }
+@keyframes flash { 50% { filter: brightness(1.25); transform: scale(1.03); } }
+@keyframes frame { 50% { box-shadow: inset 0 0 0 4px var(--crit); } }
 
 /* ---------- Notes ---------- */
 .notes { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; min-width: 0; min-height: 520px; overflow: hidden; }
@@ -249,9 +263,9 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
             <button class="chip" type="button" data-nudge="10">+10 min</button>
           </div>
         </div>
-        <div class="chime-row">
-          <label class="toggle"><input type="checkbox" id="chimeOn"> Chime at 5 min left</label>
-          <button class="link-btn" id="chimeTest" type="button">Preview</button>
+        <div class="alert-row">
+          <span>Big on-screen alert at 5 min left and at time’s up</span>
+          <button class="link-btn" id="alertTest" type="button">Preview</button>
         </div>
       </section>
     </aside>
@@ -329,6 +343,14 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
   <section class="stage-notes"><div class="notes-content" id="stageNotes"></div></section>
 </div>
 
+<div class="alert" id="alert" hidden role="alert">
+  <div class="alert-card">
+    <p class="alert-title" id="alertTitle">5 minutes left</p>
+    <p class="alert-sub" id="alertSub">Start wrapping up your answers.</p>
+    <p class="alert-hint">Click anywhere to dismiss</p>
+  </div>
+</div>
+
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
@@ -375,37 +397,20 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
     return ['ok', 'On track'];
   }
 
-  // ---- 5-minute chime (Web Audio, no sound files) ----
-  let audio = null;
-  function audioCtx() {
-    if (!audio) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; audio = new AC(); }
-    if (audio.state === 'suspended') audio.resume().catch(() => {});
-    return audio;
+  // ---- on-screen alerts (5 min left, time's up) ----
+  const alertEl = $('#alert');
+  let alertTimer;
+  function showAlert(kind) {
+    const crit = kind === 'done';
+    $('#alertTitle').textContent = crit ? 'Time’s up' : '5 minutes left';
+    $('#alertSub').textContent = crit ? 'Pens down, please stop writing.' : 'Start wrapping up your answers.';
+    alertEl.dataset.state = crit ? 'done' : 'crit';
+    alertEl.hidden = false;
+    clearTimeout(alertTimer);
+    alertTimer = setTimeout(() => { alertEl.hidden = true; }, 12000);
   }
-  // Browsers only allow sound after a click or key press, so unlock audio on the first one
-  const unlock = () => { audioCtx(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
-  window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
-  function playChime() {
-    const ctx = audioCtx(); if (!ctx) return;
-    const t0 = ctx.currentTime + 0.05;
-    const master = ctx.createGain(); master.gain.value = 0.35; master.connect(ctx.destination);
-    // Three soft bell tones, C5 E5 G5, played twice
-    [523.25, 659.25, 783.99, 523.25, 659.25, 783.99].forEach((f, i) => {
-      const t = t0 + i * 0.32 + (i >= 3 ? 0.5 : 0);
-      for (const [mult, vol] of [[1, 1], [2, 0.25], [3, 0.08]]) {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = 'sine'; o.frequency.value = f * mult;
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(vol, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
-        o.connect(g); g.connect(master); o.start(t); o.stop(t + 1.7);
-      }
-    });
-  }
-  state.chime = store.get('chime', true);
-  $('#chimeOn').checked = state.chime;
-  $('#chimeOn').addEventListener('change', (e) => { state.chime = e.target.checked; store.set('chime', state.chime); });
-  $('#chimeTest').addEventListener('click', playChime);
+  alertEl.addEventListener('click', () => { alertEl.hidden = true; });
+  $('#alertTest').addEventListener('click', () => showAlert('crit'));
 
   // ---- clock tick ----
   let lastSec = -1, prevLeft = null;
@@ -419,7 +424,11 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
 
     const left = state.endAt == null ? 0 : state.endAt - now;
     const [st, label] = status(left);
-    if (state.chime && state.endAt != null && prevLeft != null && prevLeft > 5 * MIN && left <= 5 * MIN && left > 0) playChime();
+    if (state.endAt != null && prevLeft != null) {
+      if (prevLeft > 5 * MIN && left <= 5 * MIN && left > 0) showAlert('crit');
+      if (prevLeft > 0 && left <= 0) showAlert('done');
+    }
+    $('#stage').dataset.state = st;
     prevLeft = state.endAt == null ? null : left;
     const leftText = state.endAt == null ? '--:--' : fmtLeft(left);
     const total = Math.max(1, state.endAt - state.startAt);
@@ -442,7 +451,7 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
   }
   function setEnd(endAt, keepStart) {
     state.endAt = endAt;
-    prevLeft = null; // changing the end time never triggers the chime by itself
+    prevLeft = null; // changing the end time never triggers an alert by itself
     if (!keepStart || state.startAt == null) state.startAt = Date.now();
     store.set('endAt', state.endAt); store.set('startAt', state.startAt);
     renderEnd();
