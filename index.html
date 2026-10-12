@@ -524,6 +524,14 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
   // ---- presentation ----
   const stage = $('#stage'), stageNotes = $('#stageNotes');
   let wakeLock = null;
+  // Keep the screen from dimming or sleeping while presenting
+  function keepAwake() {
+    navigator.wakeLock?.request('screen').then(l => { wakeLock = l; }).catch(() => {});
+  }
+  // The browser drops the lock whenever the tab is hidden, so ask again when it comes back
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !stage.hidden) keepAwake();
+  });
   function fitStage() {
     // Largest font size (up to the chosen scale) that fits the notes panel without scrolling
     const box = stageNotes;
@@ -547,7 +555,7 @@ kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; bord
     requestAnimationFrame(fitStage);
     const fs = document.documentElement.requestFullscreen?.();
     fs?.catch?.(() => {});
-    navigator.wakeLock?.request('screen').then(l => { wakeLock = l; }).catch(() => {});
+    keepAwake();
   }
   function closeStage() {
     stage.hidden = true;
