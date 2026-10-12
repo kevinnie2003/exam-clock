@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Exam Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: proctor dashboard = clock rail on the left, notes editor on the right; presentation = title, a row of three clocks, notes filling the rest */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --ink: #14202e;
+  --muted: #5b6878;
+  --line: #d9e0e8;
+  --accent: #2f5fa8;          /* exam blue book */
+  --accent-soft: #e3ecf8;
+  --on-accent: #ffffff;
+  --ok: #1d7f52;  --ok-soft: #dff2e8;
+  --warn: #a8640a; --warn-soft: #fbefd9;
+  --crit: #c3352b; --crit-soft: #fbe2df;
+  --hl: #fff1a8;
+  --ink-red: #c3352b; --ink-blue: #2f5fa8; --ink-green: #1d7f52;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-digits: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131a; --surface: #161d27; --surface-2: #1b2430; --ink: #e8edf3; --muted: #95a2b3; --line: #2a3545;
+    --accent: #85aae6; --accent-soft: #1f2d44; --on-accent: #0e131a;
+    --ok: #4cc38a; --ok-soft: #173327; --warn: #f0b246; --warn-soft: #3a2c12; --crit: #ff6b5e; --crit-soft: #401b18;
+    --hl: #5c4f12; --ink-red: #ff7b6e; --ink-blue: #85aae6; --ink-green: #5fd19a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131a; --surface: #161d27; --surface-2: #1b2430; --ink: #e8edf3; --muted: #95a2b3; --line: #2a3545;
+  --accent: #85aae6; --accent-soft: #1f2d44; --on-accent: #0e131a;
+  --ok: #4cc38a; --ok-soft: #173327; --warn: #f0b246; --warn-soft: #3a2c12; --crit: #ff6b5e; --crit-soft: #401b18;
+  --hl: #5c4f12; --ink-red: #ff7b6e; --ink-blue: #85aae6; --ink-green: #5fd19a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.label { font-family: var(--font-digits); font-weight: 600; font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.digits { font-family: var(--font-digits); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.01em; }
+.ampm { font-size: .42em; font-weight: 600; letter-spacing: .04em; margin-left: .18em; color: var(--muted); }
+
+/* ---------- Dashboard ---------- */
+.app { max-width: 1440px; margin: 0 auto; padding-inline: 24px; padding-block: 20px 28px; display: flex; flex-direction: column; gap: 20px; min-height: 100%; }
+
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.title-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand svg { width: 18px; height: 18px; color: var(--accent); }
+.exam-title { margin: 0; font-family: var(--font-digits); font-weight: 700; font-size: clamp(2rem, 4.4vw, 3.4rem); line-height: 1.05; letter-spacing: -.01em; text-wrap: balance; border-radius: 8px; padding: 2px 6px; margin-left: -6px; outline: none; cursor: text; transition: background .15s; }
+.exam-title:hover { background: var(--surface-2); }
+.exam-title:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--accent); }
+.title-hint { font-size: .85rem; color: var(--muted); }
+
+.top-actions { display: flex; gap: 10px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 700; transition: border-color .15s, background .15s; }
+.btn:hover { border-color: var(--accent); }
+.btn svg { width: 18px; height: 18px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+kbd { font-family: var(--font-digits); font-size: .75rem; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; }
+
+.grid { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 20px; flex: 1; align-items: start; }
+.rail { display: flex; flex-direction: column; gap: 14px; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.card .digits { font-size: clamp(2.6rem, 5vw, 3.6rem); }
+
+.countdown { border-width: 2px; }
+.countdown .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.countdown .digits { font-size: clamp(3.4rem, 7vw, 5rem); }
+.pill { font-family: var(--font-digits); font-weight: 700; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.bar { height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; border-radius: inherit; transition: width .5s linear; }
+.bar-legend { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+[data-state="ok"]   { --state: var(--ok);   --state-soft: var(--ok-soft); }
+[data-state="warn"] { --state: var(--warn); --state-soft: var(--warn-soft); }
+[data-state="crit"], [data-state="done"] { --state: var(--crit); --state-soft: var(--crit-soft); }
+[data-state="idle"] { --state: var(--muted); --state-soft: var(--surface-2); }
+.countdown[data-state] { border-color: var(--state); }
+[data-state] .pill { background: var(--state-soft); color: var(--state); }
+[data-state] .bar > i { background: var(--state); }
+[data-state="done"] .digits-left { color: var(--crit); }
+@media (prefers-reduced-motion: no-preference) {
+  [data-state="done"] .digits-left { animation: blink 1s steps(2, start) infinite; }
+}
+@keyframes blink { to { opacity: .35; } }
+
+.end-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.link-btn { background: none; border: 0; padding: 4px 0; color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.picker { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.picker-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.picker input[type="time"] { font-family: var(--font-digits); font-size: 1.4rem; font-weight: 600; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
+.chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-family: var(--font-digits); font-weight: 600; font-size: .95rem; font-variant-numeric: tabular-nums; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.picker small { color: var(--muted); }
+
+.chime-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: .9rem; }
+.toggle { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.toggle input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+
+/* ---------- Notes ---------- */
+.notes { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; min-width: 0; min-height: 520px; overflow: hidden; }
+.notes-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 16px 20px 10px; flex-wrap: wrap; }
+.notes-head p { margin: 0; color: var(--muted); font-size: .9rem; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 8px 14px; background: var(--surface-2); border-block: 1px solid var(--line); }
+.tb { min-width: 36px; height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid transparent; background: none; cursor: pointer; color: var(--ink); }
+.tb:hover { background: var(--surface); border-color: var(--line); }
+.tb.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.tb svg { width: 18px; height: 18px; }
+.tb-sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.swatch { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.size-readout { font-family: var(--font-digits); font-weight: 600; min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.editor-wrap { flex: 1; overflow: auto; position: relative; }
+.notes-content { font-size: calc(26px * var(--scale, 1)); line-height: 1.3; overflow-wrap: anywhere; }
+.notes-content p, .notes-content div { margin: 0 0 .25em; }
+.notes-content ul, .notes-content ol { margin: 0 0 .25em; padding-left: 1.3em; }
+.notes-content ul { list-style: disc; }
+.notes-content ul ul { list-style: circle; }
+.notes-content ul ul ul { list-style: square; }
+.notes-content ol { list-style: decimal; }
+.notes-content ol ol { list-style: lower-alpha; }
+.notes-content li { margin: .08em 0; padding-left: .15em; }
+.notes-content li::marker { color: var(--accent); }
+.notes-content b, .notes-content strong { font-weight: 700; }
+/* Text colors are stored as sentinel values and mapped to theme tokens, so they read in light and dark */
+.notes-content [style*="color: rgb(0, 0, 1)"], .notes-content font[color="#000001"] { color: var(--ink) !important; }
+.notes-content [style*="color: rgb(255, 0, 1)"], .notes-content font[color="#ff0001"] { color: var(--ink-red) !important; }
+.notes-content [style*="color: rgb(0, 0, 255)"], .notes-content font[color="#0000ff"] { color: var(--ink-blue) !important; }
+.notes-content [style*="color: rgb(0, 255, 1)"], .notes-content font[color="#00ff01"] { color: var(--ink-green) !important; }
+.notes-content [style*="background-color: rgb(255, 241, 1)"] { background-color: var(--hl) !important; color: inherit; }
+.notes-content blockquote { margin: 0 0 .25em; padding-left: .6em; border-left: 4px solid var(--accent); color: var(--muted); }
+.editor { min-height: 100%; padding: 20px 24px 32px; outline: none; }
+.editor.is-empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; position: absolute; }
+.notes-foot { display: flex; justify-content: space-between; gap: 10px; padding: 10px 20px; border-top: 1px solid var(--line); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.saved { color: var(--ok); }
+
+/* ---------- Presentation ---------- */
+.stage { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; grid-template-rows: auto auto minmax(0, 1fr); padding: max(2.2vh, 16px) max(2.4vw, 16px); gap: 2vh; }
+.stage-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.stage-title { margin: 0; font-family: var(--font-digits); font-weight: 700; font-size: clamp(1.8rem, 4.2vw, 4.6rem); line-height: 1; letter-spacing: -.01em; }
+.exit { opacity: .25; transition: opacity .2s; }
+.stage:hover .exit, .exit:focus-visible { opacity: 1; }
+.stage-times { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1fr); gap: 1.6vw; }
+.time-block { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 2vh 1.8vw; display: flex; flex-direction: column; justify-content: center; gap: 1vh; min-width: 0; }
+.time-block .label { font-size: clamp(.8rem, 1.1vw, 1.3rem); }
+.time-block .digits { font-size: clamp(2.2rem, 5.2vw, 7rem); white-space: nowrap; }
+.time-block.countdown { border-width: 3px; background: var(--state-soft); }
+.time-block.countdown .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.time-block.countdown .digits { font-size: clamp(2.8rem, 6.6vw, 9rem); color: var(--state); }
+.time-block.countdown .pill { font-size: clamp(.75rem, 1vw, 1.2rem); background: var(--surface); }
+.time-block.countdown .bar { height: 1vh; min-height: 6px; background: var(--surface); }
+.stage-notes { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 2.4vh 2.2vw; overflow: hidden; min-height: 0; }
+.stage-notes .notes-content { height: 100%; overflow: hidden; }
+.stage-notes .empty { color: var(--muted); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 860px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .stage-times { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .time-block.countdown { grid-column: 1 / -1; order: -1; }
+}
+@media (max-width: 480px) {
+  .app { padding-inline: 16px; }
+  .top-actions .btn span.hide-sm { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="title-wrap">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>
+        <span class="label">Exam Clock</span>
+      </div>
+      <h1 class="exam-title" id="title" contenteditable="true" spellcheck="false" aria-label="Exam title">CSE 100 · Quiz 2</h1>
+      <span class="title-hint">Click the title to rename it.</span>
+    </div>
+    <div class="top-actions">
+      <button class="btn primary" id="presentBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        Present <span class="hide-sm"><kbd>P</kbd></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <aside class="rail" aria-label="Time overview">
+      <section class="card">
+        <span class="label">Time now</span>
+        <span class="digits" id="now">--:--</span>
+      </section>
+
+      <section class="card countdown" id="cdCard" data-state="idle" aria-live="off">
+        <div class="head">
+          <span class="label">Time left</span>
+          <span class="pill" id="cdPill">Not set</span>
+        </div>
+        <span class="digits digits-left" id="left">--:--</span>
+        <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+        <div class="bar-legend"><span id="startedAt">Start</span><span id="endsAtSmall">End</span></div>
+      </section>
+
+      <section class="card">
+        <div class="end-row">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span class="label">Ends at</span>
+            <span class="digits" id="endAt">--:--</span>
+          </div>
+          <button class="link-btn" id="changeEnd" type="button" aria-expanded="false" aria-controls="picker">Change</button>
+        </div>
+        <div class="picker" id="picker" hidden>
+          <div class="picker-row">
+            <label class="label" for="endInput">End time</label>
+            <input type="time" id="endInput">
+            <button class="btn primary" id="setEnd" type="button">Set</button>
+          </div>
+          <div class="picker-row" aria-label="Duration from now">
+            <button class="chip" type="button" data-add="30">+30 min</button>
+            <button class="chip" type="button" data-add="50">+50 min</button>
+            <button class="chip" type="button" data-add="80">+1:20</button>
+            <button class="chip" type="button" data-add="120">+2:00</button>
+            <button class="chip" type="button" data-add="180">+3:00</button>
+          </div>
+          <div class="picker-row" aria-label="Adjust current end time">
+            <small>Extend or shorten:</small>
+            <button class="chip" type="button" data-nudge="-5">−5 min</button>
+            <button class="chip" type="button" data-nudge="5">+5 min</button>
+            <button class="chip" type="button" data-nudge="10">+10 min</button>
+          </div>
+        </div>
+        <div class="chime-row">
+          <label class="toggle"><input type="checkbox" id="chimeOn"> Chime at 5 min left</label>
+          <button class="link-btn" id="chimeTest" type="button">Preview</button>
+        </div>
+      </section>
+    </aside>
+
+    <section class="notes" aria-label="Exam notes">
+      <div class="notes-head">
+        <span class="label">Notes for the room</span>
+        <p>Typos, clarifications, rules. Type “- ” for a bullet or “1. ” for a numbered list.</p>
+      </div>
+      <div class="toolbar" role="toolbar" aria-label="Formatting">
+        <button class="tb" type="button" data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
+        <button class="tb" type="button" data-cmd="italic" title="Italic (⌘I)"><i>I</i></button>
+        <button class="tb" type="button" data-cmd="underline" title="Underline (⌘U)"><u>U</u></button>
+        <span class="tb-sep"></span>
+        <button class="tb" type="button" data-cmd="insertUnorderedList" title="Bullet list">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="6" r="1.8"/><circle cx="5" cy="12" r="1.8"/><circle cx="5" cy="18" r="1.8"/><rect x="9" y="5" width="12" height="2" rx="1"/><rect x="9" y="11" width="12" height="2" rx="1"/><rect x="9" y="17" width="12" height="2" rx="1"/></svg>
+        </button>
+        <button class="tb" type="button" data-cmd="insertOrderedList" title="Numbered list">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><text x="2" y="8.5" font-size="7" font-family="sans-serif" font-weight="700">1</text><text x="2" y="14.5" font-size="7" font-family="sans-serif" font-weight="700">2</text><text x="2" y="20.5" font-size="7" font-family="sans-serif" font-weight="700">3</text><rect x="9" y="5" width="12" height="2" rx="1"/><rect x="9" y="11" width="12" height="2" rx="1"/><rect x="9" y="17" width="12" height="2" rx="1"/></svg>
+        </button>
+        <button class="tb" type="button" data-cmd="outdent" title="Outdent (Shift+Tab)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 6H11M21 12H11M21 18H11M7 9l-3 3 3 3"/></svg>
+        </button>
+        <button class="tb" type="button" data-cmd="indent" title="Indent (Tab)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 6H11M21 12H11M21 18H11M4 9l3 3-3 3"/></svg>
+        </button>
+        <span class="tb-sep"></span>
+        <button class="tb" type="button" data-color="#000001" title="Default text color"><span class="swatch" style="background:var(--ink)"></span></button>
+        <button class="tb" type="button" data-color="#ff0001" title="Red text"><span class="swatch" style="background:var(--ink-red)"></span></button>
+        <button class="tb" type="button" data-color="#0000ff" title="Blue text"><span class="swatch" style="background:var(--ink-blue)"></span></button>
+        <button class="tb" type="button" data-color="#00ff01" title="Green text"><span class="swatch" style="background:var(--ink-green)"></span></button>
+        <button class="tb" type="button" data-cmd="highlight" title="Highlight">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l-5 5v4h4l5-5M14 6l4 4M9 11l5-5 4 4-5 5z"/><path d="M3 22h18" stroke="var(--warn)" stroke-width="3"/></svg>
+        </button>
+        <span class="tb-sep"></span>
+        <button class="tb" type="button" id="sizeDown" title="Smaller text">A−</button>
+        <span class="size-readout" id="sizeReadout">100%</span>
+        <button class="tb" type="button" id="sizeUp" title="Larger text">A+</button>
+        <span class="tb-sep"></span>
+        <button class="tb" type="button" data-cmd="removeFormat" title="Clear formatting">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 4h12M12 4l-4 16M4 20l16-16" /></svg>
+        </button>
+        <button class="tb" type="button" data-cmd="undo" title="Undo (⌘Z)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg>
+        </button>
+        <button class="tb" type="button" data-cmd="redo" title="Redo (⌘⇧Z)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 000 10h3"/></svg>
+        </button>
+      </div>
+      <div class="editor-wrap">
+        <div class="editor notes-content" id="editor" contenteditable="true" data-placeholder="Write rules, clarifications or typo fixes for the room…"></div>
+      </div>
+      <div class="notes-foot">
+        <span id="wordCount">0 words</span>
+        <span class="saved" id="saved">Saved on this device</span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="stage" id="stage" hidden>
+  <header class="stage-top">
+    <h2 class="stage-title" id="stageTitle"></h2>
+    <button class="btn exit" id="exitBtn" type="button">Exit <kbd>Esc</kbd></button>
+  </header>
+  <div class="stage-times">
+    <div class="time-block"><span class="label">Time now</span><span class="digits" id="sNow"></span></div>
+    <div class="time-block countdown" id="sCd" data-state="idle">
+      <div class="head"><span class="label">Time left</span><span class="pill" id="sPill"></span></div>
+      <span class="digits digits-left" id="sLeft"></span>
+      <div class="bar" aria-hidden="true"><i id="sBar"></i></div>
+    </div>
+    <div class="time-block"><span class="label">Ends at</span><span class="digits" id="sEnd"></span></div>
+  </div>
+  <section class="stage-notes"><div class="notes-content" id="stageNotes"></div></section>
+</div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const KEY = 'examclock:';
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(KEY + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {} },
+  };
+
+  const MIN = 60000;
+  const SAMPLE_NOTES = '<p>Please bring your student ID when you hand in the quiz.</p><ul><li>Write your <b>PID</b> on every page</li><li>Fill in the bubbles for Q1–15</li><li>Q16–19: write the letter in the numbered box<ul><li>Q18 typo: “heap” should read <span style="color: rgb(255, 0, 1);">“min-heap”</span></li></ul></li></ul><p><span style="background-color: rgb(255, 241, 1);">No calculators.</span> One double-sided note sheet allowed.</p>';
+
+  // ---- state ----
+  const roundTo5 = (t) => Math.ceil(t / (5 * MIN)) * 5 * MIN;
+  const state = {
+    title: store.get('title', 'CSE 100 · Quiz 2'),
+    notes: store.get('notes', SAMPLE_NOTES),
+    endAt: store.get('endAt', null),
+    startAt: store.get('startAt', null),
+    scale: store.get('scale', 1),
+  };
+  if (state.endAt == null) { state.endAt = roundTo5(Date.now() + 95 * MIN); state.startAt = state.endAt - 120 * MIN; }
+
+  // ---- formatting ----
+  const timeFmt = (secs) => new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', ...(secs ? { second: '2-digit' } : {}) });
+  const fmtNow = timeFmt(true), fmtShort = timeFmt(false);
+  function clockHTML(fmt, t) {
+    const parts = fmt.formatToParts(t);
+    const main = parts.filter(p => p.type !== 'dayPeriod').map(p => p.value).join('').trim();
+    const dp = parts.find(p => p.type === 'dayPeriod');
+    return main + (dp ? `<span class="ampm">${dp.value}</span>` : '');
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  function fmtLeft(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    return h ? `${h}:${pad(m)}:${pad(r)}` : `${m}:${pad(r)}`;
+  }
+  function status(left) {
+    if (state.endAt == null) return ['idle', 'Not set'];
+    if (left <= 0) return ['done', 'Time’s up'];
+    if (left <= 5 * MIN) return ['crit', 'Last 5 min'];
+    if (left <= 15 * MIN) return ['warn', 'Finish up'];
+    return ['ok', 'On track'];
+  }
+
+  // ---- 5-minute chime (Web Audio, no sound files) ----
+  let audio = null;
+  function audioCtx() {
+    if (!audio) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; audio = new AC(); }
+    if (audio.state === 'suspended') audio.resume().catch(() => {});
+    return audio;
+  }
+  // Browsers only allow sound after a click or key press, so unlock audio on the first one
+  const unlock = () => { audioCtx(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+  window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
+  function playChime() {
+    const ctx = audioCtx(); if (!ctx) return;
+    const t0 = ctx.currentTime + 0.05;
+    const master = ctx.createGain(); master.gain.value = 0.35; master.connect(ctx.destination);
+    // Three soft bell tones, C5 E5 G5, played twice
+    [523.25, 659.25, 783.99, 523.25, 659.25, 783.99].forEach((f, i) => {
+      const t = t0 + i * 0.32 + (i >= 3 ? 0.5 : 0);
+      for (const [mult, vol] of [[1, 1], [2, 0.25], [3, 0.08]]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f * mult;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+        o.connect(g); g.connect(master); o.start(t); o.stop(t + 1.7);
+      }
+    });
+  }
+  state.chime = store.get('chime', true);
+  $('#chimeOn').checked = state.chime;
+  $('#chimeOn').addEventListener('change', (e) => { state.chime = e.target.checked; store.set('chime', state.chime); });
+  $('#chimeTest').addEventListener('click', playChime);
+
+  // ---- clock tick ----
+  let lastSec = -1, prevLeft = null;
+  function tick(force) {
+    const now = Date.now();
+    const sec = Math.floor(now / 1000);
+    if (sec === lastSec && !force) return;
+    lastSec = sec;
+    const nowHTML = clockHTML(fmtNow, now);
+    $('#now').innerHTML = nowHTML; $('#sNow').innerHTML = nowHTML;
+
+    const left = state.endAt == null ? 0 : state.endAt - now;
+    const [st, label] = status(left);
+    if (state.chime && state.endAt != null && prevLeft != null && prevLeft > 5 * MIN && left <= 5 * MIN && left > 0) playChime();
+    prevLeft = state.endAt == null ? null : left;
+    const leftText = state.endAt == null ? '--:--' : fmtLeft(left);
+    const total = Math.max(1, state.endAt - state.startAt);
+    const pct = state.endAt == null ? 0 : Math.min(100, Math.max(0, (now - state.startAt) / total * 100));
+    for (const [card, pill, digits, bar] of [['#cdCard', '#cdPill', '#left', '#bar'], ['#sCd', '#sPill', '#sLeft', '#sBar']]) {
+      $(card).dataset.state = st;
+      $(pill).textContent = label;
+      $(digits).textContent = leftText;
+      $(bar).style.width = pct + '%';
+    }
+    document.title = (st === 'idle' ? '' : leftText + ' · ') + 'Exam Clock';
+  }
+  function renderEnd() {
+    const endHTML = state.endAt == null ? '--:--' : clockHTML(fmtShort, state.endAt);
+    $('#endAt').innerHTML = endHTML; $('#sEnd').innerHTML = endHTML;
+    $('#endsAtSmall').textContent = state.endAt == null ? 'End' : 'Ends ' + fmtShort.format(state.endAt);
+    $('#startedAt').textContent = state.startAt == null ? 'Start' : 'Started ' + fmtShort.format(state.startAt);
+    if (state.endAt != null) { const d = new Date(state.endAt); $('#endInput').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+    tick(true);
+  }
+  function setEnd(endAt, keepStart) {
+    state.endAt = endAt;
+    prevLeft = null; // changing the end time never triggers the chime by itself
+    if (!keepStart || state.startAt == null) state.startAt = Date.now();
+    store.set('endAt', state.endAt); store.set('startAt', state.startAt);
+    renderEnd();
+  }
+
+  // ---- end time picker ----
+  const picker = $('#picker'), changeBtn = $('#changeEnd');
+  changeBtn.addEventListener('click', () => {
+    picker.hidden = !picker.hidden;
+    changeBtn.setAttribute('aria-expanded', String(!picker.hidden));
+    changeBtn.textContent = picker.hidden ? 'Change' : 'Done';
+    if (!picker.hidden) $('#endInput').focus();
+  });
+  $('#setEnd').addEventListener('click', () => {
+    const v = $('#endInput').value; if (!v) return;
+    const [h, m] = v.split(':').map(Number);
+    const d = new Date(); d.setHours(h, m, 0, 0);
+    if (d.getTime() < Date.now() - 6 * 60 * MIN) d.setDate(d.getDate() + 1); // past by a lot: assume tomorrow
+    setEnd(d.getTime());
+  });
+  $('#endInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#setEnd').click(); });
+  picker.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    if (b.dataset.add) { const d = new Date(Date.now() + Number(b.dataset.add) * MIN); d.setSeconds(0, 0); setEnd(d.getTime()); }
+    if (b.dataset.nudge && state.endAt != null) setEnd(state.endAt + Number(b.dataset.nudge) * MIN, true);
+  });
+
+  // ---- title ----
+  const titleEl = $('#title');
+  titleEl.textContent = state.title;
+  titleEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
+  titleEl.addEventListener('paste', (e) => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain').replace(/\s+/g, ' ')); });
+  titleEl.addEventListener('input', () => { state.title = titleEl.textContent.trim(); store.set('title', state.title); });
+  titleEl.addEventListener('blur', () => { if (!titleEl.textContent.trim()) { titleEl.textContent = 'Untitled exam'; state.title = 'Untitled exam'; store.set('title', state.title); } });
+
+  // ---- editor ----
+  const ed = $('#editor');
+  ed.innerHTML = state.notes;
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); document.execCommand('styleWithCSS', false, true); } catch {}
+
+  let saveTimer;
+  function onChange() {
+    const empty = !ed.textContent.trim() && !ed.querySelector('li');
+    ed.classList.toggle('is-empty', empty);
+    const words = (ed.innerText.match(/\S+/g) || []).length;
+    $('#wordCount').textContent = `${words} word${words === 1 ? '' : 's'}`;
+    $('#saved').textContent = 'Saving…';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { state.notes = ed.innerHTML; store.set('notes', state.notes); $('#saved').textContent = 'Saved on this device'; }, 400);
+  }
+  ed.addEventListener('input', onChange);
+
+  // Markdown-style shortcuts: "- " / "* " → bullets, "1. " → numbered list
+  ed.addEventListener('input', (e) => {
+    if (e.inputType !== 'insertText' || e.data !== ' ') return;
+    const sel = getSelection(); if (!sel.rangeCount) return;
+    const node = sel.anchorNode; if (!node || node.nodeType !== 3) return;
+    if (node.parentElement.closest('li')) return;
+    const typed = node.textContent.slice(0, sel.anchorOffset).replace(/ /g, ' ');
+    let cmd = null;
+    if (typed === '- ' || typed === '* ') cmd = 'insertUnorderedList';
+    else if (/^1[.)] $/.test(typed)) cmd = 'insertOrderedList';
+    if (!cmd) return;
+    const prev = node.previousSibling;
+    if (prev && prev.nodeName !== 'BR') return;
+    const r = document.createRange(); r.setStart(node, 0); r.setEnd(node, sel.anchorOffset);
+    sel.removeAllRanges(); sel.addRange(r);
+    document.execCommand('delete');
+    document.execCommand(cmd);
+  });
+
+  ed.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      const inList = getSelection().anchorNode?.parentElement?.closest('li');
+      if (!inList) return;
+      e.preventDefault();
+      document.execCommand(e.shiftKey ? 'outdent' : 'indent');
+    }
+  });
+  // Paste as plain text so formatting from Word/Docs can't break the layout
+  ed.addEventListener('paste', (e) => {
+    e.preventDefault();
+    document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+  });
+
+  const toolbar = document.querySelector('.toolbar');
+  toolbar.addEventListener('mousedown', (e) => { if (e.target.closest('.tb')) e.preventDefault(); }); // keep editor selection
+  toolbar.addEventListener('click', (e) => {
+    const b = e.target.closest('.tb'); if (!b) return;
+    ed.focus();
+    if (b.dataset.cmd === 'highlight') {
+      const cur = document.queryCommandValue('hiliteColor') || document.queryCommandValue('backColor');
+      const has = /255, 241, 1/.test(cur || '');
+      document.execCommand('hiliteColor', false, has ? 'transparent' : '#fff101');
+    } else if (b.dataset.cmd) {
+      document.execCommand(b.dataset.cmd);
+    } else if (b.dataset.color) {
+      document.execCommand('foreColor', false, b.dataset.color);
+    }
+    onChange(); syncToolbar();
+  });
+  function syncToolbar() {
+    for (const b of toolbar.querySelectorAll('[data-cmd]')) {
+      const c = b.dataset.cmd;
+      if (['bold', 'italic', 'underline', 'insertUnorderedList', 'insertOrderedList'].includes(c)) {
+        let on = false; try { on = document.queryCommandState(c); } catch {}
+        b.classList.toggle('on', on);
+      }
+    }
+  }
+  document.addEventListener('selectionchange', () => { if (ed.contains(getSelection().anchorNode)) syncToolbar(); });
+
+  // ---- text size ----
+  function applyScale() {
+    document.documentElement.style.setProperty('--scale', state.scale);
+    $('#sizeReadout').textContent = Math.round(state.scale * 100) + '%';
+    store.set('scale', state.scale);
+    if (!stage.hidden) fitStage();
+  }
+  $('#sizeDown').addEventListener('click', () => { state.scale = Math.max(0.6, +(state.scale - 0.1).toFixed(2)); applyScale(); });
+  $('#sizeUp').addEventListener('click', () => { state.scale = Math.min(2.5, +(state.scale + 0.1).toFixed(2)); applyScale(); });
+
+  // ---- presentation ----
+  const stage = $('#stage'), stageNotes = $('#stageNotes');
+  let wakeLock = null;
+  function fitStage() {
+    // Largest font size (up to the chosen scale) that fits the notes panel without scrolling
+    const box = stageNotes;
+    let hi = Math.max(18, window.innerWidth * 0.028 * state.scale), lo = 12;
+    box.style.fontSize = hi + 'px';
+    if (box.scrollHeight <= box.clientHeight) return;
+    for (let i = 0; i < 12; i++) {
+      const mid = (hi + lo) / 2;
+      box.style.fontSize = mid + 'px';
+      if (box.scrollHeight <= box.clientHeight) lo = mid; else hi = mid;
+    }
+    box.style.fontSize = lo + 'px';
+  }
+  function openStage() {
+    $('#stageTitle').textContent = state.title;
+    const hasNotes = ed.textContent.trim() || ed.querySelector('li');
+    stageNotes.innerHTML = hasNotes ? ed.innerHTML : '<p class="empty">No notes yet.</p>';
+    stage.hidden = false;
+    document.body.style.overflow = 'hidden';
+    tick(true);
+    requestAnimationFrame(fitStage);
+    const fs = document.documentElement.requestFullscreen?.();
+    fs?.catch?.(() => {});
+    navigator.wakeLock?.request('screen').then(l => { wakeLock = l; }).catch(() => {});
+  }
+  function closeStage() {
+    stage.hidden = true;
+    document.body.style.overflow = '';
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    wakeLock?.release?.().catch(() => {}); wakeLock = null;
+  }
+  $('#presentBtn').addEventListener('click', openStage);
+  $('#exitBtn').addEventListener('click', closeStage);
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !stage.hidden) closeStage(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !stage.hidden) closeStage();
+    const editing = e.target.isContentEditable || /INPUT|TEXTAREA/.test(e.target.tagName);
+    if (!editing && (e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey && stage.hidden) openStage();
+  });
+  window.addEventListener('resize', () => { if (!stage.hidden) fitStage(); });
+
+  // ---- boot ----
+  applyScale();
+  renderEnd();
+  onChange();
+  setInterval(tick, 250);
+})();
+</script>
+</body>
+</html>
